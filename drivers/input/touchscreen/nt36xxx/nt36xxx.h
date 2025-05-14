@@ -113,7 +113,7 @@ struct nvt_ts_data {
 	struct pinctrl *ts_pinctrl;
 	struct pinctrl_state *pinctrl_state_active;
 	struct pinctrl_state *pinctrl_state_suspend;
-
+	struct attribute_group attrs;
 	struct regulator *vddio_reg;
 	struct regulator *lab_reg;
 	struct regulator *ibb_reg;
@@ -151,6 +151,8 @@ struct nvt_ts_data {
 	uint8_t xbuf[1025];
 	struct mutex xbuf_lock;
 	bool irq_enabled;
+	int gesture_enable;
+	int is_suspended;
 
 	size_t config_array_size;
 #if WAKEUP_GESTURE

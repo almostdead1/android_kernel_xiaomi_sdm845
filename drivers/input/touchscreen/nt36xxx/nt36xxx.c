@@ -1664,6 +1664,114 @@ err_pinctrl_get:
 	return retval;
 }
 
+static ssize_t nvt_panel_wake_gesture_show(struct device *dev,
+				     struct device_attribute *attr, char *buf)
+{
+        const char c = ts->gesture_enabled ? '1' : '0';
+        return sprintf(buf, "%c\n", c);
+}
+
+static ssize_t nvt_panel_wake_gesture_store(struct device *dev,
+				     struct device_attribute *attr, const char *buf, size_t count)
+{
+	int i;
+
+	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
+		ts->gesture_enabled = i;
+		return count;
+	} else {
+		dev_dbg(dev, "enable_dt2w write error\n");
+		return -EINVAL;
+	}
+}
+
+static DEVICE_ATTR(wake_gesture, S_IWUSR | S_IRUSR,
+		nvt_panel_wake_gesture_show, nvt_panel_wake_gesture_store);
+   
+
+static struct attribute *nvt_attr_group[] = {
+	&dev_attr_wake_gesture.attr,
+    NULL
+};
+
+static struct nvt_ts_data *ts_g = NULL;
+static struct proc_dir_entry *prEntry_tp = NULL;
+
+#define PAGESIZE 512
+
+#define BIT7 (0x1 << 7)
+
+int DouTap_gesture = 0; //"double tap"
+
+static ssize_t tp_gesture_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int ret = 0;
+	char page[PAGESIZE];
+	struct nvt_ts_data *ts = ts_g;
+	if(!ts)
+		return ret;
+	NVT_LOG("gesture enable is: %d\n", ts->gesture_enable);
+	ret = sprintf(page, "%d\n", ts->gesture_enable);
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
+}
+
+static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+	char buf[10];
+	struct nvt_ts_data *ts = ts_g;
+	int write_value;
+	if(!ts)
+		return count;
+	if( count > 2 || ts->is_suspended)
+		return count;
+	if( copy_from_user(buf, buffer, count) ){
+		NVT_ERR("%s: read proc input error.\n", __func__);
+		return count;
+	}
+	NVT_LOG("%s write [0x%x]\n",__func__,buf[0]);
+
+    DouTap_gesture = (buf[0] & BIT7)?1:0; //double tap
+
+	if(DouTap_gesture)
+	{
+		ts->gesture_enable = 1;
+		write_value = 1;
+	}
+	else
+    {
+        ts->gesture_enable = 0;
+		write_value = 0;
+    }
+	ts->gesture_enabled = write_value;
+
+	return count;
+}
+static const struct file_operations tp_gesture_proc_fops = {
+	.write = tp_gesture_write_func,
+	.read =  tp_gesture_read_func,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
+
+int nvt_gesture_proc_init(void)
+{
+	int ret = 0;
+	struct proc_dir_entry *prEntry_tmp  = NULL;
+	prEntry_tp = proc_mkdir("touchpanel", NULL);
+	if( prEntry_tp == NULL ){
+		ret = -ENOMEM;
+		NVT_LOG("Couldn't create touchpanel\n");
+	}
+
+	prEntry_tmp = proc_create( "gesture_enable", 0666, prEntry_tp, &tp_gesture_proc_fops);
+	if(prEntry_tmp == NULL){
+		ret = -ENOMEM;
+        NVT_LOG("Couldn't create gesture_enable\n");
+	}
+    return ret;
+}
+
 /*******************************************************
 Description:
 	Novatek touchscreen driver probe function.
@@ -1688,6 +1796,8 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 
 	ts->client = client;
 	i2c_set_clientdata(client, ts);
+	ts_g = ts;
+	ts->is_suspended = 0;
 
 	//---parse dts---
 	nvt_parse_dt(&client->dev);
@@ -1782,6 +1892,8 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 		input_set_capability(ts->input_dev, EV_KEY, touch_key_array[retry]);
 	}
 #endif
+
+	nvt_gesture_proc_init();
 
 #if WAKEUP_GESTURE
 	for (retry = 0; retry < ARRAY_SIZE(gesture_key_array); retry++) {
@@ -1901,6 +2013,12 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 		goto err_register_drm_notif_failed;
 	}
 #endif
+
+	ts->attrs.attrs = nvt_attr_group;
+	ret = sysfs_create_group(&client->dev.kobj, &ts->attrs);
+	if (ret) {
+		NVT_ERR("Cannot create sysfs structure!\n");
+	}
 
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
