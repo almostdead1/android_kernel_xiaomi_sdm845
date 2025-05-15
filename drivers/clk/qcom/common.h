@@ -73,7 +73,7 @@ extern int qcom_cc_probe(struct platform_device *pdev,
 extern int qcom_cc_register_rcg_dfs(struct platform_device *pdev,
 			 const struct qcom_cc_dfs_desc *desc);
 
-extern struct clk_ops clk_dummy_ops;
+extern const struct clk_ops clk_dummy_ops;
 
 #define BM(msb, lsb)	(((((uint32_t)-1) << (31-msb)) >> (31-msb+lsb)) << lsb)
 #define BVAL(msb, lsb, val)	(((val) << lsb) & BM(msb, lsb))

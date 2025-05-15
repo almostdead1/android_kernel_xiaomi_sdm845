@@ -25,6 +25,7 @@
 #include <linux/mfd/syscon.h>
 
 #include "clk-debug.h"
+#include "common.h"
 
 static struct measure_clk_data debug_mux_priv = {
 	.ctl_reg = 0x62024,
