@@ -58,7 +58,7 @@ static int dummy_clk_set_flags(struct clk_hw *hw, unsigned int flags)
 	return 0;
 }
 
-struct clk_ops clk_dummy_ops = {
+const struct clk_ops clk_dummy_ops = {
 	.set_rate = dummy_clk_set_rate,
 	.round_rate = dummy_clk_round_rate,
 	.recalc_rate = dummy_clk_recalc_rate,

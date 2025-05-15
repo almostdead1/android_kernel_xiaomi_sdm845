@@ -3454,13 +3454,13 @@ int group_show(struct seq_file *m, void *v)
 
 	list_for_each_entry(p, &grp->tasks, grp_list) {
 
-		total_demand += p->ravg.demand_scaled;
+		total_demand += p->ravg.demand;
 
 		if (!im_rendering(p))
 			continue;
 
-		seq_printf(m, "%u, %lu, %d\n", p->pid, p->ravg.demand_scaled, p->cpu);
-		render_demand += p->ravg.demand_scaled;
+		seq_printf(m, "%u, %lu, %d\n", p->pid, p->ravg.demand, p->cpu);
+		render_demand += p->ravg.demand;
 	}
 
 	seq_printf(m, "total: %u / render: %u\n", total_demand, render_demand);
