@@ -1755,6 +1755,7 @@ static int find_lowest_rq(struct task_struct *task)
 	unsigned long tutil = task_util(task);
 	int best_cpu_idle_idx = INT_MAX;
 	int cpu_idle_idx = -1;
+	bool boost_on_big = rt_boost_on_big();
 	enum sched_boost_policy placement_boost;
 	int prev_cpu = task_cpu(task);
 	int start_cpu = walt_start_cpu(prev_cpu);
