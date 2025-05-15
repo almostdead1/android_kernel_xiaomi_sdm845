@@ -14,6 +14,7 @@
 #ifndef __QCOM_CLK_DEBUG_H__
 #define __QCOM_CLK_DEBUG_H__
 
+#include <linux/platform_device.h>
 #include "../clk.h"
 
 /**
