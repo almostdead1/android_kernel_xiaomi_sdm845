@@ -40,6 +40,9 @@
 #include <oneplus/houston/houston_helper.h>
 #endif
 
+#ifdef CONFIG_IM
+#include <linux/oem/im.h>
+#endif
 #ifdef CONFIG_CONTROL_CENTER
 #include <linux/oem/control_center.h>
 #endif
