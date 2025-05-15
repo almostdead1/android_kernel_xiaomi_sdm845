@@ -4120,7 +4120,7 @@ void set_user_nice(struct task_struct *p, long nice)
 #ifdef CONFIG_CONTROL_CENTER
 	p->cached_prio = p->static_prio;
 #endif
-	set_load_weight(p);
+	set_load_weight(p, true);
 	old_prio = p->prio;
 	p->prio = effective_prio(p);
 	delta = p->prio - old_prio;
@@ -4323,7 +4323,7 @@ static void __setscheduler_params(struct task_struct *p,
 	 */
 	p->rt_priority = attr->sched_priority;
 	p->normal_prio = normal_prio(p);
-	set_load_weight(p);
+	set_load_weight(p, true);
 }
 
 /* Actually do priority change: must hold pi & rq lock. */
