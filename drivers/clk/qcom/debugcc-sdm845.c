@@ -845,7 +845,7 @@ struct clk_hw *debugcc_sdm845_hws[] = {
 static int clk_debug_845_probe(struct platform_device *pdev)
 {
 	struct clk *clk;
-	int ret = 0, count;
+	int ret = 0, count, i;
 
 	clk = devm_clk_get(&pdev->dev, "xo_clk_src");
 	if (IS_ERR(clk)) {
@@ -855,6 +855,22 @@ static int clk_debug_845_probe(struct platform_device *pdev)
 	}
 
 	debug_mux_priv.cxo = clk;
+
+	for (i = 0; i < ARRAY_SIZE(mux_list); i++) {
+		ret = map_debug_bases(pdev, mux_list[i].regmap_name,
+				      mux_list[i].mux);
+		if (ret == -EBADR)
+			continue;
+		else if (ret)
+			return ret;
+
+		clk = devm_clk_register(&pdev->dev, &mux_list[i].mux->hw);
+		if (IS_ERR(clk)) {
+			dev_err(&pdev->dev, "Unable to register %s, err:(%d)\n",
+				mux_list[i].mux->hw.init->name, PTR_ERR(clk));
+			return PTR_ERR(clk);
+		}
+	}
 
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,cc-count",
 								&count);
