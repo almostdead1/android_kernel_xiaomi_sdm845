@@ -100,6 +100,9 @@
 #ifdef CONFIG_HOUSTON
 #include <oneplus/houston/houston_helper.h>
 #endif
+#ifdef CONFIG_IM
+#include <linux/oem/im.h>
+#endif
 
 ATOMIC_NOTIFIER_HEAD(load_alert_notifier_head);
 
