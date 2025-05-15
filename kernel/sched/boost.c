@@ -23,7 +23,7 @@
  */
 
 unsigned int sysctl_sched_boost;
-static enum sched_boost_policy boost_policy;
+enum sched_boost_policy boost_policy;
 static enum sched_boost_policy boost_policy_dt = SCHED_BOOST_NONE;
 static DEFINE_MUTEX(boost_mutex);
 static unsigned int freq_aggr_threshold_backup;
@@ -96,11 +96,6 @@ static void set_boost_policy(int type)
 	}
 
 	boost_policy = SCHED_BOOST_ON_ALL;
-}
-
-enum sched_boost_policy sched_boost_policy(void)
-{
-	return boost_policy;
 }
 
 static bool verify_boost_params(int old_val, int new_val)
@@ -209,9 +204,4 @@ int sched_boost_handler(struct ctl_table *table, int write,
 done:
 	mutex_unlock(&boost_mutex);
 	return ret;
-}
-
-int sched_boost(void)
-{
-	return sysctl_sched_boost;
 }
