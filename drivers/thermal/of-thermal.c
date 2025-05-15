@@ -39,6 +39,10 @@
 
 #include "thermal_core.h"
 
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
 /***   Private data structures to represent thermal device tree data ***/
 /**
  * struct __thermal_bind_param - a match between trip and cooling device
@@ -1453,6 +1457,10 @@ int __init of_parse_thermal_zones(void)
 			/* attempting to build remaining zones still */
 			continue;
 		}
+
+#ifdef CONFIG_HOUSTON
+		ht_register_thermal_zone_device(zone);
+#endif
 		tz->tzd = zone;
 	}
 	of_node_put(np);

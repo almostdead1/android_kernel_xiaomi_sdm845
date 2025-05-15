@@ -61,6 +61,10 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
+
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 
 /*
@@ -1739,6 +1743,10 @@ struct task_struct {
 	struct hlist_head preempt_notifiers;
 #endif
 
+#ifdef CONFIG_RATP
+	cpumask_t			cpus_suggested;
+#endif
+
 #ifdef CONFIG_BLK_DEV_IO_TRACE
 	unsigned int btrace_seq;
 #endif
@@ -2200,6 +2208,52 @@ struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
+#endif
+
+#ifdef CONFIG_CONTROL_CENTER
+	bool cc_enable;
+	struct cc_tsk_data *ctd;
+	u64 nice_effect_ts;
+	int cached_prio;
+#endif
+
+#ifdef CONFIG_IM
+	int im_flag;
+#endif
+
+#ifdef CONFIG_HOUSTON
+#ifndef HT_PERF_COUNT_MAX
+#define HT_PERF_COUNT_MAX 5
+	spinlock_t rtg_lock;
+	struct list_head rtg_node;
+	struct list_head rtg_perf_node;
+	s64 rtg_ts;
+	s64 rtg_ts2;
+	s64 rtg_period_ts;
+	u32 rtg_cnt;
+	u32 rtg_peak;
+	u64 prev_schedstat;
+	u64 prev_ts_us;
+
+	struct list_head perf_node;
+	u32 perf_activate;
+	u32 perf_regular_activate;
+	u64 enqueue_ts;
+	u64 run_ts;
+	u64 end_ts;
+	u64 acc_run_ts;
+	u64 delta_ts;
+	u64 total_run_ts;
+
+	s64 f_ts;
+	u32 f_cnt;
+	u32 f_peak;
+	u64 perf_counters[HT_PERF_COUNT_MAX];
+	struct perf_event *perf_events[HT_PERF_COUNT_MAX];
+	struct work_struct perf_work;
+	struct list_head ht_perf_event_node;
+#undef HT_PERF_COUNT_MAX
+#endif
 #endif
 /* CPU-specific state of this task */
 	struct thread_struct thread;
@@ -2915,6 +2969,11 @@ static inline void sched_autogroup_detach(struct task_struct *p) { }
 static inline void sched_autogroup_fork(struct signal_struct *sig) { }
 static inline void sched_autogroup_exit(struct signal_struct *sig) { }
 static inline void sched_autogroup_exit_task(struct task_struct *p) { }
+#endif
+
+#ifdef CONFIG_CONTROL_CENTER
+extern void restore_user_nice_safe(struct task_struct *p);
+extern void set_user_nice_no_cache(struct task_struct *p, long nice);
 #endif
 
 extern int yield_to(struct task_struct *p, bool preempt);

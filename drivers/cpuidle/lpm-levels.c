@@ -52,6 +52,9 @@
 #endif /* CONFIG_COMMON_CLK */
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_low_power.h>
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
 
 #define SCLK_HZ (32768)
 #define PSCI_POWER_STATE(reset) (reset << 30)
@@ -612,6 +615,43 @@ static inline bool is_cpu_biased(int cpu)
 		return false;
 
 	return (now - last) < BIAS_HYST;
+}
+
+static inline bool lpm_disallowed(s64 sleep_us, int cpu, struct lpm_cpu *pm_cpu)
+{
+	uint64_t bias_time = 0;
+
+#ifdef CONFIG_CONTROL_CENTER
+	uint64_t tb_block_ts;
+	int tb_ccdm_idx = cpu + CCDM_TB_CPU_0_IDLE_BLOCK;
+#endif
+
+	if (cpu_isolated(cpu))
+		goto out;
+
+	if (sleep_disabled)
+		return true;
+
+	bias_time = sched_lpm_disallowed_time(cpu);
+	if (bias_time) {
+		pm_cpu->bias = bias_time;
+		return true;
+	}
+
+#ifdef CONFIG_CONTROL_CENTER
+	tb_block_ts = ccdm_get_hint(tb_ccdm_idx);
+	if (!time_after64(get_jiffies_64(), tb_block_ts))
+		return true;
+#endif
+
+out:
+#ifdef CONFIG_CONTROL_CENTER
+	ccdm_update_hint_1(tb_ccdm_idx, ULLONG_MAX);
+#endif
+	if (sleep_us < 0)
+		return true;
+
+	return false;
 }
 
 static int cpu_power_select(struct cpuidle_device *dev,

@@ -524,6 +524,10 @@ static inline void clk_disable_unprepare(struct clk *clk)
 struct device_node;
 struct of_phandle_args;
 
+#ifdef CONFIG_HOUSTON
+extern void clk_get_ddr_freq(u64 *val);
+#endif
+
 #if defined(CONFIG_OF)
 struct clk *of_clk_get(struct device_node *np, int index);
 struct clk *of_clk_get_by_name(struct device_node *np, const char *name);

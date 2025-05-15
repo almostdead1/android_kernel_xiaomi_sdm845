@@ -30,6 +30,10 @@
 
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_IM
+#include <linux/oem/im.h>
+#endif
+
 const char *task_event_names[] = {"PUT_PREV_TASK", "PICK_NEXT_TASK",
 				  "TASK_WAKE", "TASK_MIGRATE", "TASK_UPDATE",
 				"IRQ_UPDATE"};
@@ -2853,6 +2857,13 @@ void add_new_task_to_grp(struct task_struct *new)
 	unsigned long flags;
 	struct related_thread_group *grp;
 
+#ifdef CONFIG_IM
+	if (im_sf(new)) {
+		if (!im_render_grouping_enable())
+			im_list_add_task(new);
+	}
+#endif
+
 	/*
 	 * If the task does not belong to colocated schedtune
 	 * cgroup, nothing to do. We are checking this without
@@ -3420,3 +3431,61 @@ void walt_sched_init(struct rq *rq)
 	walt_cpu_util_freq_divisor =
 	    (sched_ravg_window >> SCHED_CAPACITY_SHIFT) * 100;
 }
+
+#ifdef CONFIG_IM
+int group_show(struct seq_file *m, void *v)
+{
+	struct related_thread_group *grp;
+	unsigned long flags;
+	struct task_struct *p;
+	u64 total_demand = 0;
+	u64 render_demand = 0;
+
+	if (!im_render_grouping_enable())
+		return 0;
+
+	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
+
+	raw_spin_lock_irqsave(&grp->lock, flags);
+	if (list_empty(&grp->tasks)) {
+		raw_spin_unlock_irqrestore(&grp->lock, flags);
+		return 0;
+	}
+
+	list_for_each_entry(p, &grp->tasks, grp_list) {
+
+		total_demand += p->ravg.demand_scaled;
+
+		if (!im_rendering(p))
+			continue;
+
+		seq_printf(m, "%u, %lu, %d\n", p->pid, p->ravg.demand_scaled, p->cpu);
+		render_demand += p->ravg.demand_scaled;
+	}
+
+	seq_printf(m, "total: %u / render: %u\n", total_demand, render_demand);
+
+	raw_spin_unlock_irqrestore(&grp->lock, flags);
+	return 0;
+}
+
+void group_remove(void)
+{
+	struct related_thread_group *grp;
+	struct task_struct *p, *next;
+
+	if (!im_render_grouping_enable())
+		return;
+
+	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
+
+	if (list_empty(&grp->tasks))
+		return;
+
+	list_for_each_entry_safe(p, next, &grp->tasks, grp_list) {
+		if (im_sf(p))
+			sched_set_group_id(p, 0);
+	}
+}
+#endif
+

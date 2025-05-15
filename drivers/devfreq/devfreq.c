@@ -28,6 +28,10 @@
 #include <linux/of.h>
 #include "governor.h"
 
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
+
 static struct class *devfreq_class;
 
 /*
@@ -286,6 +290,20 @@ int update_devfreq(struct devfreq *devfreq)
 		freq = devfreq->max_freq;
 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
 	}
+
+#ifdef CONFIG_CONTROL_CENTER
+	if (cc_ddr_boost_enabled()) {
+		if (devfreq->dev.cc_marked) {
+			unsigned long val;
+
+			devfreq->dev.parent->cc_marked = devfreq->dev.cc_marked;
+
+			val = cc_get_expect_ddrfreq();
+			if (val)
+				freq = val;
+		}
+	}
+#endif
 
 	if (devfreq->profile->get_cur_freq)
 		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
@@ -594,6 +612,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	devfreq_set_freq_limits(devfreq);
 
 	dev_set_name(&devfreq->dev, "%s", dev_name(dev));
+
+#ifdef CONFIG_CONTROL_CENTER
+	if (dev_name(dev))
+		devfreq->dev.cc_marked = cc_is_ddrfreq_related(dev_name(dev));
+#endif
+
 	err = device_register(&devfreq->dev);
 	if (err) {
 		mutex_unlock(&devfreq->lock);

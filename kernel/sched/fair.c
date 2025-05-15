@@ -36,6 +36,13 @@
 #include "tune.h"
 #include "walt.h"
 #include <trace/events/sched.h>
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
+#ifdef CONFIG_CONTROL_CENTER
+#include <linux/oem/control_center.h>
+#endif
 
 #ifdef CONFIG_SCHED_WALT
 
@@ -7044,6 +7051,29 @@ static int start_cpu(struct task_struct *p, bool boosted,
 		start_cpu = rd->min_cap_orig_cpu;
 	else
 		start_cpu = rd->max_cap_orig_cpu;
+#if defined(CONFIG_HOUSTON) && defined(CONFIG_OPCHAIN)
+	if (is_uxtop && current->ravg.demand_scaled >= p->ravg.demand_scaled) {
+		ht_rtg_list_add_tail(current);
+	}
+#endif
+
+#if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
+	if ((im_rendering(p)) &&
+			im_render_grouping_enable() &&
+			ccdm_get_hint(CCDM_TB_PLACE_BOOST) &&
+			task_util(p) > ccdm_get_min_util_threshold()) {
+		start_cpu = rd->mid_cap_orig_cpu == -1 ?
+			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+		return start_cpu;
+	}
+#endif
+#ifdef CONFIG_IM
+	if (im_hwuiEx(p)) {
+		start_cpu = rd->mid_cap_orig_cpu == -1 ?
+			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+		return start_cpu;
+	}
+#endif
 
 	return walt_start_cpu(start_cpu);
 }

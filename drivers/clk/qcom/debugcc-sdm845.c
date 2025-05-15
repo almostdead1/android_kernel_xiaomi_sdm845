@@ -798,6 +798,49 @@ static const struct of_device_id clk_debug_match_table[] = {
 	{}
 };
 
+static const char *const mc_cc_debug_mux_parent_names[] = {
+	"measure_only_mccc_clk",
+};
+
+static struct clk_debug_mux mc_cc_debug_mux = {
+	.period_offset = 0x50,
+	.hw.init = &(struct clk_init_data){
+		.name = "mc_cc_debug_mux",
+		.ops = &clk_debug_mux_ops,
+		.parent_names = mc_cc_debug_mux_parent_names,
+		.num_parents = ARRAY_SIZE(mc_cc_debug_mux_parent_names),
+		.flags = CLK_IS_MEASURE,
+	},
+};
+
+static struct mux_regmap_names mux_list[] = {
+	{ .mux = &mc_cc_debug_mux, .regmap_name = "qcom,mccc" },
+};
+
+static struct clk_dummy measure_only_mccc_clk = {
+	.rrate = 1000,
+	.hw.init = &(struct clk_init_data){
+		.name = "measure_only_mccc_clk",
+		.ops = &clk_dummy_ops,
+	},
+};
+
+#if defined(CONFIG_CONTROL_CENTER) || defined(CONFIG_HOUSTON)
+int get_only_mccc_hw(struct clk_hw **hwptr)
+{
+	if (unlikely(!&(measure_only_mccc_clk.hw))) {
+		*hwptr = NULL;
+		return -EINVAL;
+	}
+	*hwptr = &(measure_only_mccc_clk.hw);
+	return 0;
+}
+#endif
+
+struct clk_hw *debugcc_sdm845_hws[] = {
+	&measure_only_mccc_clk.hw,
+};
+
 static int clk_debug_845_probe(struct platform_device *pdev)
 {
 	struct clk *clk;

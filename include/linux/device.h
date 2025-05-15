@@ -862,6 +862,11 @@ struct device {
 
 	bool			offline_disabled:1;
 	bool			offline:1;
+
+#ifdef CONFIG_CONTROL_CENTER
+	bool cc_marked;
+#endif
+
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)

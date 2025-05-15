@@ -80,6 +80,15 @@
 #include <linux/sysctl.h>
 #include <linux/kcov.h>
 #include <linux/cpufreq_times.h>
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
+#ifdef CONFIG_IM
+#include <linux/oem/im.h>
+#endif
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -549,6 +558,14 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	tsk->splice_pipe = NULL;
 	tsk->task_frag.page = NULL;
 	tsk->wake_q.next = NULL;
+#ifdef CONFIG_CONTROL_CENTER
+	tsk->nice_effect_ts = 0;
+	tsk->cached_prio = tsk->static_prio;
+#endif
+
+#ifdef CONFIG_RATP
+	tsk->cpus_suggested = CPU_MASK_ALL;
+#endif
 
 	account_kernel_stack(tsk, 1);
 
@@ -2003,6 +2020,27 @@ static __latent_entropy struct task_struct *copy_process(
 
 	trace_task_newtask(p, clone_flags);
 	uprobe_copy_process(p, clone_flags);
+
+#if defined(CONFIG_CONTROL_CENTER) || defined(CONFIG_HOUSTON) || defined(CONFIG_IM)
+	if (likely(!IS_ERR(p))) {
+#ifdef CONFIG_HOUSTON
+		ht_perf_event_init(p);
+		ht_rtg_init(p);
+#endif
+#ifdef CONFIG_CONTROL_CENTER
+		cc_tsk_init((void *) p);
+#endif
+#ifdef CONFIG_TPP
+		p->tpp_flag = 0;
+#endif
+#ifdef CONFIG_ONEPLUS_FG_OPT
+		p->fuse_boost = 0;
+#endif
+#ifdef CONFIG_IM
+		im_tsk_init_flag((void *) p);
+#endif
+	}
+#endif
 
 	return p;
 

@@ -12,6 +12,9 @@
 #include <trace/events/sched.h>
 
 #include "walt.h"
+#ifdef CONFIG_CONTROL_CENTER
+#include <linux/oem/control_center.h>
+#endif
 
 int sched_rr_timeslice = RR_TIMESLICE;
 int sysctl_sched_rr_timeslice = (MSEC_PER_SEC / HZ) * RR_TIMESLICE;
@@ -1779,6 +1782,12 @@ static int find_lowest_rq(struct task_struct *task)
 			rcu_read_unlock();
 			goto noea;
 		}
+
+#if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
+	boost_on_big = boost_on_big |
+		im_hwc(task) | // HWC select big core first
+		(im_sf(task) && ccdm_get_hint(CCDM_TB_PLACE_BOOST));
+#endif
 
 		sg = sd->groups;
 		do {
