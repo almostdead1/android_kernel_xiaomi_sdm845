@@ -293,6 +293,7 @@ void clk_get_ddr_freq(u64 *val)
 	struct clk_hw *hw = NULL;
 	struct clk_hw *parent;
 	struct clk_debug_mux *mux;
+	int dbg_cc;
 	int ret = 0;
 	u32 regval;
 
@@ -312,7 +313,7 @@ void clk_get_ddr_freq(u64 *val)
 			return;
 		}
 		mux = to_clk_measure(parent);
-		regmap_read(mux->regmap, mux->period_offset, &regval);
+		regmap_read(mux->regmap[dbg_cc], mux->period_offset, &regval);
 		if (!regval) {
 			pr_err("Error reading mccc period register, ret = %d\n",
 			       ret);
@@ -334,6 +335,7 @@ static int clk_debug_read_period(void *data, u64 *val)
 	struct clk_hw *hw = data;
 	struct clk_hw *parent;
 	struct clk_debug_mux *mux;
+	int dbg_cc;
 	int ret = 0;
 	u32 regval;
 
@@ -347,7 +349,7 @@ static int clk_debug_read_period(void *data, u64 *val)
 			return -EINVAL;
 		}
 		mux = to_clk_measure(parent);
-		regmap_read(mux->regmap, mux->period_offset, &regval);
+		regmap_read(mux->regmap[dbg_cc], mux->period_offset, &regval);
 		if (!regval) {
 			pr_err("Error reading mccc period register, ret = %d\n",
 			       ret);
