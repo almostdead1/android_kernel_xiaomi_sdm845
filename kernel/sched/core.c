@@ -746,7 +746,7 @@ int tg_nop(struct task_group *tg, void *data)
 }
 #endif
 
-static void set_load_weight(struct task_struct *p)
+static void set_load_weight(struct task_struct *p, bool update_load)
 {
 	int prio = p->static_prio - MAX_RT_PRIO;
 	struct load_weight *load = &p->se.load;
@@ -2541,7 +2541,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 #endif
 
 		p->prio = p->normal_prio = __normal_prio(p);
-		set_load_weight(p);
+		set_load_weight(p, false);
 
 		/*
 		 * We don't need the reset flag anymore after the fork. It has
@@ -8492,7 +8492,7 @@ void __init sched_init(void)
 	i = alloc_related_thread_groups();
 	BUG_ON(i);
 
-	set_load_weight(&init_task);
+	set_load_weight(&init_task, false);
 
 	/*
 	 * The boot idle thread does lazy MMU switching as well:
