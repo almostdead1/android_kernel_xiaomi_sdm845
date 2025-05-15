@@ -20,10 +20,13 @@
 #include <linux/sched.h>
 #include <linux/sched/rt.h>
 #include <linux/syscore_ops.h>
+#include <linux/sched/core_ctl.h>
 
 #include <trace/events/sched.h>
 #include "sched.h"
 #include "walt.h"
+
+#include <linux/oem/control_center.h>
 
 #define MAX_CPUS_PER_CLUSTER 6
 #define MAX_CLUSTERS 2
@@ -1037,6 +1040,48 @@ static int core_ctl_isolation_dead_cpu(unsigned int cpu)
 {
 	return isolation_cpuhp_state(cpu, false);
 }
+
+int core_ctl_op_boost(bool boost, int level)
+{
+	unsigned int index = 0;
+	struct cluster_data *cluster;
+	unsigned long flags;
+	int ret = 0;
+	bool boost_state_changed = false;
+	int total_boost = -1;
+
+	if (unlikely(!initialized))
+		return 0;
+
+	tracing_mark_write(0, "cctl_boost", boost);
+	spin_lock_irqsave(&state_lock, flags);
+	for_each_cluster(cluster, index) {
+		if (boost) {
+			boost_state_changed = !cluster->op_boost;
+			if (ccdm_get_hint(CCDM_TB_CCTL_BOOST) && cluster->op_boost == 0)
+				++cluster->op_boost;
+			if (++total_boost == level)
+				break;
+		} else {
+			if (!cluster->op_boost) {
+				ret = -EINVAL;
+				break;
+			}
+			--cluster->op_boost;
+			boost_state_changed = !cluster->op_boost;
+		}
+	}
+	spin_unlock_irqrestore(&state_lock, flags);
+
+	if (boost_state_changed) {
+		index = 0;
+		for_each_cluster(cluster, index)
+			apply_need(cluster);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(core_ctl_op_boost);
 
 /* ============================ init code ============================== */
 

@@ -24,4 +24,10 @@ static inline int core_ctl_set_boost(bool boost)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_CONTROL_CENTER
+int core_ctl_op_boost(bool boost, int level);
+#else
+static inline int core_ctl_op_boost(bool boost, int level) { return 0; }
+#endif
 #endif
