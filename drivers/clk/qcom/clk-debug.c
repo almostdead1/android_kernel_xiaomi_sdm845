@@ -131,6 +131,26 @@ static unsigned long clk_debug_mux_measure_rate(struct clk_hw *hw)
 	return ret;
 }
 
+static int clk_find_and_set_parent(struct clk_hw *mux, struct clk_hw *clk)
+{
+	int i;
+
+	if (!clk || !mux || !(mux->init->flags & CLK_IS_MEASURE))
+		return -EINVAL;
+
+	if (!clk_set_parent(mux->clk, clk->clk))
+		return 0;
+
+	for (i = 0; i < clk_hw_get_num_parents(mux); i++) {
+		struct clk_hw *parent = clk_hw_get_parent_by_index(mux, i);
+
+		if (!clk_find_and_set_parent(parent, clk))
+			return clk_set_parent(mux->clk, parent->clk);
+	}
+
+	return -EINVAL;
+}
+
 static u8 clk_debug_mux_get_parent(struct clk_hw *hw)
 {
 	struct clk_debug_mux *meas = to_clk_measure(hw);
@@ -308,6 +328,44 @@ void clk_get_ddr_freq(u64 *val)
 	mutex_unlock(&clk_debug_lock);
 }
 #endif
+
+static int clk_debug_read_period(void *data, u64 *val)
+{
+	struct clk_hw *hw = data;
+	struct clk_hw *parent;
+	struct clk_debug_mux *mux;
+	int ret = 0;
+	u32 regval;
+
+	mutex_lock(&clk_debug_lock);
+
+	ret = clk_find_and_set_parent(measure, hw);
+	if (!ret) {
+		parent = clk_hw_get_parent(measure);
+		if (!parent) {
+			mutex_unlock(&clk_debug_lock);
+			return -EINVAL;
+		}
+		mux = to_clk_measure(parent);
+		regmap_read(mux->regmap, mux->period_offset, &regval);
+		if (!regval) {
+			pr_err("Error reading mccc period register, ret = %d\n",
+			       ret);
+			mutex_unlock(&clk_debug_lock);
+			return 0;
+		}
+		*val = 1000000000000UL;
+		do_div(*val, regval);
+	} else {
+		pr_err("Failed to set the debug mux's parent.\n");
+	}
+
+	mutex_unlock(&clk_debug_lock);
+	return ret;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(clk_read_period_fops, clk_debug_read_period,
+							NULL, "%lld\n");
 
 int clk_debug_measure_add(struct clk_hw *hw, struct dentry *dentry)
 {
