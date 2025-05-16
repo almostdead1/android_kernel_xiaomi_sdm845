@@ -60,6 +60,7 @@ struct cluster_data {
 	struct task_struct *core_ctl_thread;
 	unsigned int first_cpu;
 	unsigned int boost;
+	unsigned int op_boost;
 	struct kobject kobj;
 };
 
@@ -340,6 +341,8 @@ static ssize_t show_global_state(const struct cluster_data *state, char *buf)
 						cluster->nr_isolated_cpus);
 		count += snprintf(buf + count, PAGE_SIZE - count,
 				"\tBoost: %u\n", (unsigned int) cluster->boost);
+		count += snprintf(buf + count, PAGE_SIZE - count,
+				"\tOPBoost: %u\n", (unsigned int) cluster->op_boost);
 	}
 	spin_unlock_irq(&state_lock);
 
@@ -546,6 +549,14 @@ static bool adjustment_possible(const struct cluster_data *cluster,
 	return (need < cluster->active_cpus || (need > cluster->active_cpus &&
 						cluster->nr_isolated_cpus));
 }
+#define TRACE_DEBUG 0
+
+static inline void tracing_mark_write(int serial, char *name, unsigned int value)
+{
+#if TRACE_DEBUG
+	trace_printk("C|%d|%s|%u\n", 99990+serial, name, value);
+#endif
+}
 
 static bool eval_need(struct cluster_data *cluster)
 {
@@ -562,7 +573,7 @@ static bool eval_need(struct cluster_data *cluster)
 
 	spin_lock_irqsave(&state_lock, flags);
 
-	if (cluster->boost || !cluster->enable) {
+	if (cluster->boost || cluster->op_boost || !cluster->enable) {
 		need_cpus = cluster->max_cpus;
 	} else {
 		cluster->active_cpus = get_active_cpu_count(cluster);

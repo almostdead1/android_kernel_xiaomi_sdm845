@@ -232,4 +232,7 @@ struct cpuload {
 	long long iowait_avg;
 	long long iowait_sum;
 };
+
+extern int ohm_get_cur_cpuload(bool ctrl);
+
 #endif // __INCLUDE_HOUSTON__
