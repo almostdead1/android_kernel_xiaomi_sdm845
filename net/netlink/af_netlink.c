@@ -2362,7 +2362,8 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 EXPORT_SYMBOL(netlink_ack);
 
 int netlink_rcv_skb(struct sk_buff *skb, int (*cb)(struct sk_buff *,
-						     struct nlmsghdr *))
+						   struct nlmsghdr *,
+						   struct netlink_ext_ack *))
 {
 	struct nlmsghdr *nlh;
 	int err;
