@@ -20,6 +20,7 @@
 #include <linux/rhashtable.h>
 #include <linux/list.h>
 
+#include <linux/netfilter/nf_conntrack_dns.h>
 #include <linux/netfilter/nf_conntrack_tcp.h>
 #include <linux/netfilter/nf_conntrack_dccp.h>
 #include <linux/netfilter/nf_conntrack_sctp.h>
