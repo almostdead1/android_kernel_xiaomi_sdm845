@@ -21,6 +21,7 @@
 #include <linux/clk-provider.h>
 #include <linux/of.h>
 #include <linux/mfd/syscon.h>
+#include <linux/slab.h>
 
 #include "clk-regmap.h"
 #include "clk-debug.h"
