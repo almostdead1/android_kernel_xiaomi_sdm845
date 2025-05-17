@@ -2730,7 +2730,6 @@ static inline bool is_full_throttle_boost(void)
 	return sched_boost() == FULL_THROTTLE_BOOST;
 }
 
-extern int sched_boost(void);
 extern int preferred_cluster(struct sched_cluster *cluster,
 						struct task_struct *p);
 extern struct sched_cluster *rq_cluster(struct rq *rq);
