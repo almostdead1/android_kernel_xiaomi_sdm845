@@ -20,6 +20,7 @@
 #include <linux/platform_device.h>
 #include <linux/clk-provider.h>
 #include <linux/of.h>
+#include <linux/mfd/syscon.h>
 
 #include "clk-regmap.h"
 #include "clk-debug.h"
