@@ -399,3 +399,31 @@ int clk_debug_measure_register(struct clk_hw *hw)
 }
 EXPORT_SYMBOL(clk_debug_measure_register);
 
+/**
+ * map_debug_bases - maps each debug mux based on phandle
+ * @pdev: the platform device used to find phandles
+ * @base: regmap base name used to look up phandle
+ * @mux: debug mux that requires a regmap
+ *
+ * This function attempts to look up and map a regmap for a debug mux
+ * using syscon_regmap_lookup_by_phandle if the base name property exists
+ * and assigns an appropriate regmap.
+ *
+ * Returns 0 on success, -EBADR when it can't find base name, -EERROR otherwise.
+ */
+int map_debug_bases(struct platform_device *pdev, const char *base,
+		    struct clk_debug_mux *mux)
+{
+	if (!of_get_property(pdev->dev.of_node, base, NULL))
+		return -EBADR;
+
+	mux->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+						     base);
+	if (IS_ERR(mux->regmap)) {
+		pr_err("Failed to map %s (ret=%ld)\n", base,
+				PTR_ERR(mux->regmap));
+		return PTR_ERR(mux->regmap);
+	}
+	return 0;
+}
+EXPORT_SYMBOL(map_debug_bases);
