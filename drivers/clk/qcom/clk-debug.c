@@ -415,16 +415,25 @@ EXPORT_SYMBOL(clk_debug_measure_register);
 int map_debug_bases(struct platform_device *pdev, const char *base,
 		    struct clk_debug_mux *mux)
 {
+	struct regmap *temp_regmap;
+
 	if (!of_get_property(pdev->dev.of_node, base, NULL))
 		return -EBADR;
 
-	mux->regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
-						     base);
-	if (IS_ERR(mux->regmap)) {
+	temp_regmap = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, base);
+	if (IS_ERR(temp_regmap)) {
 		pr_err("Failed to map %s (ret=%ld)\n", base,
-				PTR_ERR(mux->regmap));
-		return PTR_ERR(mux->regmap);
+				PTR_ERR(temp_regmap));
+		return PTR_ERR(temp_regmap);
 	}
+
+	mux->regmap = kmalloc(sizeof(struct regmap *), GFP_KERNEL);
+	if (!mux->regmap) {
+		pr_err("Failed to allocate memory for mux->regmap\n");
+		return -ENOMEM;
+	}
+	*mux->regmap = temp_regmap;
+
 	return 0;
 }
 EXPORT_SYMBOL(map_debug_bases);

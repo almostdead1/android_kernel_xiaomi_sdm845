@@ -23,6 +23,7 @@
  */
 
 unsigned int sysctl_sched_boost;
+unsigned int sched_boost_type; /* currently activated sched boost */
 enum sched_boost_policy boost_policy;
 static enum sched_boost_policy boost_policy_dt = SCHED_BOOST_NONE;
 static DEFINE_MUTEX(boost_mutex);

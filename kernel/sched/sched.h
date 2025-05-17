@@ -2719,6 +2719,12 @@ static inline enum sched_boost_policy sched_boost_policy(void)
 	return boost_policy;
 }
 
+extern unsigned int sched_boost_type;
+static inline int sched_boost(void)
+{
+	return sched_boost_type;
+}
+
 static inline bool rt_boost_on_big(void)
 {
 	return sched_boost() == FULL_THROTTLE_BOOST ?
@@ -2730,6 +2736,7 @@ static inline bool is_full_throttle_boost(void)
 	return sched_boost() == FULL_THROTTLE_BOOST;
 }
 
+extern int sched_boost(void);
 extern int preferred_cluster(struct sched_cluster *cluster,
 						struct task_struct *p);
 extern struct sched_cluster *rq_cluster(struct rq *rq);
