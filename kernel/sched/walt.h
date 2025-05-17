@@ -303,6 +303,8 @@ extern void walt_rotate_work_init(void);
 extern void walt_rotation_checkpoint(int nr_big);
 extern unsigned int walt_rotation_enabled;
 
+#define DEFAULT_CGROUP_COLOC_ID 1
+
 #else /* CONFIG_SCHED_WALT */
 
 static inline void walt_sched_init(struct rq *rq) { }
