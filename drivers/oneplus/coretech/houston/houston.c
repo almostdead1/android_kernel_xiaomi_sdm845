@@ -1717,8 +1717,8 @@ static unsigned int ht_ctl_poll(struct file *fp, poll_table *wait)
 static void ht_collect_system_data(struct ai_parcel *p)
 {
 	struct cpufreq_policy *pols[HT_CLUSTERS];
-	union power_supply_propval prop = {0, };
-	int i, ret;
+//	union power_supply_propval prop = {0, };
+	int i;// ret;
 
 	pols[0] = cpufreq_cpu_get(CLUS_0_IDX);
 	pols[1] = cpufreq_cpu_get(CLUS_1_IDX);
@@ -2004,10 +2004,10 @@ static const struct file_operations ht_ctl_fops = {
 
 static void ht_collect_data(void)
 {
-	union power_supply_propval prop = {0, };
+//	union power_supply_propval prop = {0, };
 	struct cpufreq_policy *pol;
 	int idx;
-	int ret;
+//	int ret;
 	int num = 0;
 
 	if (unlikely(!ht_enable))
