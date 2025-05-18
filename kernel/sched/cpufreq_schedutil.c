@@ -29,6 +29,12 @@
 
 #define SUGOV_KTHREAD_PRIORITY	50
 
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+/* Target load. Lower values result in higher CPU speeds. */
+#define DEFAULT_TARGET_LOAD 80
+static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
+#endif
+
 struct sugov_tunables {
 	struct gov_attr_set attr_set;
 	unsigned int up_rate_limit_us;
@@ -37,6 +43,11 @@ struct sugov_tunables {
 	unsigned int hispeed_freq;
 	bool pl;
 	bool iowait_boost_enable;
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	spinlock_t		target_loads_lock;
+	unsigned int		*target_loads;
+	int			ntarget_loads;
+#endif /* CONFIG_OPLUS_FEATURE_SUGOV_TL */
 };
 
 struct sugov_policy {
@@ -56,6 +67,9 @@ struct sugov_policy {
 	unsigned long avg_cap;
 	unsigned int next_freq;
 	unsigned int cached_raw_freq;
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	unsigned int		cached_raw_laf;
+#endif
 	unsigned long hispeed_util;
 	unsigned long max;
 
@@ -168,6 +182,111 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 }
 
 #define TARGET_LOAD 80
+
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+static unsigned int freq_to_targetload(
+	struct sugov_tunables *tunables, unsigned int freq)
+{
+	int i;
+	unsigned int ret;
+	unsigned long flags;
+
+	spin_lock_irqsave(&tunables->target_loads_lock, flags);
+
+	for (i = 0; i < tunables->ntarget_loads - 1 &&
+		     freq >= tunables->target_loads[i+1]; i += 2)
+		;
+
+	ret = tunables->target_loads[i];
+	spin_unlock_irqrestore(&tunables->target_loads_lock, flags);
+	return ret;
+}
+
+
+static unsigned int choose_freq(struct sugov_policy *sg_policy,
+		unsigned int loadadjfreq)
+{
+	struct cpufreq_policy *policy = sg_policy->policy;
+	unsigned int freq = policy->cur;
+	unsigned int prevfreq, freqmin, freqmax;
+	unsigned int tl;
+	int index;
+
+	freqmin = 0;
+	freqmax = UINT_MAX;
+
+	do {
+		prevfreq = freq;
+		tl = freq_to_targetload(sg_policy->tunables, freq);
+
+		/*
+		 * Find the lowest frequency where the computed load is less
+		 * than or equal to the target load.
+		 */
+
+		index = cpufreq_frequency_table_target(policy,
+						       loadadjfreq / tl,
+						       CPUFREQ_RELATION_L);
+		freq = policy->freq_table[index].frequency;
+
+		trace_choose_freq(freq, prevfreq, freqmax, freqmin, tl, index);
+
+		if (freq > prevfreq) {
+			/* The previous frequency is too low. */
+			freqmin = prevfreq;
+
+			if (freq >= freqmax) {
+				/*
+				 * Find the highest frequency that is less
+				 * than freqmax.
+				 */
+				index = cpufreq_frequency_table_target(
+					    policy,
+					    freqmax - 1, CPUFREQ_RELATION_H);
+				freq = policy->freq_table[index].frequency;
+
+				if (freq == freqmin) {
+					/*
+					 * The first frequency below freqmax
+					 * has already been found to be too
+					 * low.  freqmax is the lowest speed
+					 * we found that is fast enough.
+					 */
+					freq = freqmax;
+					break;
+				}
+			}
+		} else if (freq < prevfreq) {
+			/* The previous frequency is high enough. */
+			freqmax = prevfreq;
+
+			if (freq <= freqmin) {
+				/*
+				 * Find the lowest frequency that is higher
+				 * than freqmin.
+				 */
+				index = cpufreq_frequency_table_target(
+					    policy,
+					    freqmin + 1, CPUFREQ_RELATION_L);
+				freq = policy->freq_table[index].frequency;
+
+				/*
+				 * If freqmax is the first frequency above
+				 * freqmin then we have already found that
+				 * this speed is fast enough.
+				 */
+				if (freq == freqmax)
+					break;
+			}
+		}
+
+		/* If same frequency chosen as previous then done. */
+	} while (freq != prevfreq);
+
+	return freq;
+}
+#endif /* CONFIG_OPLUS_FEATURE_SUGOV_TL */
+
 /**
  * get_next_freq - Compute a new frequency for a given cpufreq policy.
  * @sg_policy: schedutil policy object to compute the new frequency for.
@@ -806,12 +925,104 @@ static ssize_t iowait_boost_enable_store(struct gov_attr_set *attr_set,
 	return count;
 }
 
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+static ssize_t target_loads_show(struct gov_attr_set *attr_set, char *buf)
+{
+	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
+	int i;
+	ssize_t ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&tunables->target_loads_lock, flags);
+	for (i = 0; i < tunables->ntarget_loads; i++)
+		ret += snprintf(buf + ret, PAGE_SIZE - ret - 1, "%u%s", tunables->target_loads[i],
+			i & 0x1 ? ":" : " ");
+
+	snprintf(buf + ret - 1, PAGE_SIZE - ret - 1, "\n");
+	spin_unlock_irqrestore(&tunables->target_loads_lock, flags);
+	return ret;
+}
+
+static unsigned int *get_tokenized_data(const char *buf, int *num_tokens)
+{
+	const char *cp;
+	int i;
+	int ntokens = 1;
+	unsigned int *tokenized_data;
+	int err = -EINVAL;
+
+	cp = buf;
+	while ((cp = strpbrk(cp + 1, " :")))
+		ntokens++;
+
+	if (!(ntokens & 0x1))
+		goto err;
+
+	tokenized_data = kmalloc(ntokens * sizeof(unsigned int), GFP_KERNEL);
+	if (!tokenized_data) {
+		err = -ENOMEM;
+		goto err;
+	}
+
+	cp = buf;
+	i = 0;
+	while (i < ntokens) {
+		if (sscanf(cp, "%u", &tokenized_data[i++]) != 1)
+			goto err_kfree;
+
+		cp = strpbrk(cp, " :");
+		if (!cp)
+			break;
+		cp++;
+	}
+
+	if (i != ntokens)
+		goto err_kfree;
+
+	*num_tokens = ntokens;
+
+	return tokenized_data;
+err_kfree:
+	kfree(tokenized_data);
+err:
+	return ERR_PTR(err);
+}
+
+static ssize_t target_loads_store(struct gov_attr_set *attr_set, const char *buf,
+					size_t count)
+{
+	int ntokens;
+	unsigned int *new_target_loads = NULL;
+	unsigned long flags;
+	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
+
+	new_target_loads = get_tokenized_data(buf, &ntokens);
+	if (IS_ERR(new_target_loads))
+		return PTR_ERR(new_target_loads);
+
+	spin_lock_irqsave(&tunables->target_loads_lock, flags);
+	if (tunables->target_loads != default_target_loads)
+		kfree(tunables->target_loads);
+
+	tunables->target_loads = new_target_loads;
+	tunables->ntarget_loads = ntokens;
+	spin_unlock_irqrestore(&tunables->target_loads_lock, flags);
+
+	return count;
+}
+#endif /* CONFIG_OPLUS_FEATURE_SUGOV_TL */
+
 static struct governor_attr up_rate_limit_us = __ATTR_RW(up_rate_limit_us);
 static struct governor_attr down_rate_limit_us = __ATTR_RW(down_rate_limit_us);
 static struct governor_attr hispeed_load = __ATTR_RW(hispeed_load);
 static struct governor_attr hispeed_freq = __ATTR_RW(hispeed_freq);
 static struct governor_attr pl = __ATTR_RW(pl);
 static struct governor_attr iowait_boost_enable = __ATTR_RW(iowait_boost_enable);
+
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+static struct governor_attr target_loads =
+	__ATTR(target_loads, 0664, target_loads_show, target_loads_store);
+#endif /* CONFIG_OPLUS_FEATURE_SUGOV_TL */
 
 static struct attribute *sugov_attributes[] = {
 	&up_rate_limit_us.attr,
@@ -820,6 +1031,9 @@ static struct attribute *sugov_attributes[] = {
 	&hispeed_freq.attr,
 	&pl.attr,
 	&iowait_boost_enable.attr,
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	&target_loads.attr,
+#endif /* CONFIG_OPLUS_FEATURE_SUGOV_TL */
 	NULL
 };
 
@@ -1019,6 +1233,12 @@ static int sugov_init(struct cpufreq_policy *policy)
 	tunables->down_rate_limit_us = 0;
 	tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
 	tunables->hispeed_freq = 0;
+
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	tunables->target_loads = default_target_loads;
+	tunables->ntarget_loads = ARRAY_SIZE(default_target_loads);
+	spin_lock_init(&tunables->target_loads_lock);
+#endif /* CONFIG_OPLUS_FEATURE_SUGOV_TL */
 
 	tunables->iowait_boost_enable = false;
 

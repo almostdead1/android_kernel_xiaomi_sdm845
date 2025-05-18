@@ -31,3 +31,7 @@ config RATP
        help
          In low-end platform, we will restrict admission for task placement to avoid
          CPU resource contention.
+
+config OPLUS_FEATURE_SUGOV_TL
+	default n
+	bool "A power optimization feature target loads"
