@@ -148,7 +148,8 @@ int nfnetlink_unicast(struct sk_buff *skb, struct net *net, u32 portid,
 EXPORT_SYMBOL_GPL(nfnetlink_unicast);
 
 /* Process one complete nfnetlink message. */
-static int nfnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
+static int nfnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
+			     struct netlink_ext_ack *extack)
 {
 	struct net *net = sock_net(skb->sk);
 	const struct nfnl_callback *nc;
@@ -261,7 +262,8 @@ static void nfnl_err_deliver(struct list_head *err_list, struct sk_buff *skb)
 	struct nfnl_err *nfnl_err, *next;
 
 	list_for_each_entry_safe(nfnl_err, next, err_list, head) {
-		netlink_ack(skb, nfnl_err->nlh, nfnl_err->err);
+		netlink_ack(skb, nfnl_err->nlh, nfnl_err->err,
+			    &nfnl_err->extack);
 		nfnl_err_del(nfnl_err);
 	}
 }
@@ -284,13 +286,13 @@ static void nfnetlink_rcv_batch(struct sk_buff *skb, struct nlmsghdr *nlh,
 	int err;
 
 	if (subsys_id >= NFNL_SUBSYS_COUNT)
-		return netlink_ack(skb, nlh, -EINVAL);
+		return netlink_ack(skb, nlh, -EINVAL, NULL);
 replay:
 	status = 0;
 
 	skb = netlink_skb_clone(oskb, GFP_KERNEL);
 	if (!skb)
-		return netlink_ack(oskb, nlh, -ENOMEM);
+		return netlink_ack(oskb, nlh, -ENOMEM, NULL);
 
 	nfnl_lock(subsys_id);
 	ss = nfnl_dereference_protected(subsys_id);
@@ -304,14 +306,14 @@ replay:
 #endif
 		{
 			nfnl_unlock(subsys_id);
-			netlink_ack(oskb, nlh, -EOPNOTSUPP);
+			netlink_ack(oskb, nlh, -EOPNOTSUPP, NULL);
 			return kfree_skb(skb);
 		}
 	}
 
 	if (!ss->commit || !ss->abort) {
 		nfnl_unlock(subsys_id);
-		netlink_ack(oskb, nlh, -EOPNOTSUPP);
+		netlink_ack(oskb, nlh, -EOPNOTSUPP, NULL);
 		return kfree_skb(skb);
 	}
 
@@ -401,7 +403,8 @@ ack:
 				 * pointing to the batch header.
 				 */
 				nfnl_err_reset(&err_list);
-				netlink_ack(oskb, nlmsg_hdr(oskb), -ENOMEM);
+				netlink_ack(oskb, nlmsg_hdr(oskb), -ENOMEM,
+					    NULL);
 				status |= NFNL_BATCH_FAILURE;
 				goto done;
 			}
@@ -447,7 +450,7 @@ static void nfnetlink_rcv(struct sk_buff *skb)
 		return;
 
 	if (!netlink_net_capable(skb, CAP_NET_ADMIN)) {
-		netlink_ack(skb, nlh, -EPERM);
+		netlink_ack(skb, nlh, -EPERM, NULL);
 		return;
 	}
 
