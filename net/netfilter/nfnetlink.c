@@ -226,6 +226,7 @@ struct nfnl_err {
 	struct list_head	head;
 	struct nlmsghdr		*nlh;
 	int			err;
+	struct netlink_ext_ack	extack;
 };
 
 static int nfnl_err_add(struct list_head *list, struct nlmsghdr *nlh, int err)
