@@ -36,6 +36,9 @@
 #include "tune.h"
 #include "walt.h"
 #include <trace/events/sched.h>
+#ifdef CONFIG_OPCHAIN
+#include <oneplus/uxcore/opchain_helper.h>
+#endif
 #ifdef CONFIG_HOUSTON
 #include <oneplus/houston/houston_helper.h>
 #endif
@@ -5012,6 +5015,9 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
+#ifdef CONFIG_OPCHAIN
+	opc_task_switch(true, cpu_of(rq), p, 0);
+#endif
 #ifdef CONFIG_SMP
 	int task_new = flags & ENQUEUE_WAKEUP_NEW;
 #endif
@@ -5109,7 +5115,9 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
 	int task_sleep = flags & DEQUEUE_SLEEP;
-
+#ifdef CONFIG_OPCHAIN
+	opc_task_switch(false, cpu_of(rq), p, rq->clock);
+#endif
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
 		dequeue_entity(cfs_rq, se, flags);
@@ -6980,6 +6988,9 @@ struct find_best_target_env {
 	bool need_idle;
 	int placement_boost;
 	bool avoid_prev_cpu;
+#ifdef CONFIG_OPCHAIN
+	int op_path;
+#endif
 };
 
 #ifdef CONFIG_SCHED_WALT
@@ -7054,6 +7065,15 @@ static int start_cpu(struct task_struct *p, bool boosted,
 		start_cpu = rd->min_cap_orig_cpu;
 	else
 		start_cpu = rd->max_cap_orig_cpu;
+#ifdef CONFIG_OPCHAIN
+	bool is_uxtop = is_opc_task(p, UT_FORE);
+#endif
+#ifdef CONFIG_RATP
+	struct cpumask new_mask = CPU_MASK_ALL;
+	int start_bit;
+
+	cpumask_copy(&p->cpus_suggested, &new_mask);
+#endif
 #if defined(CONFIG_HOUSTON) && defined(CONFIG_OPCHAIN)
 	if (is_uxtop && current->ravg.demand >= p->ravg.demand) {
 		ht_rtg_list_add_tail(current);
@@ -7165,7 +7185,12 @@ retry:
 			 * so prev_cpu will receive a negative bias due to the double
 			 * accounting. However, the blocked utilization may be zero.
 			 */
-			wake_util = cpu_util_wake(i, p);
+#ifdef CONFIG_OPCHAIN
+			wake_util = opc_cpu_util(cpu_util_without(i, p),
+					i, p, fbt_env->op_path);
+#else
+			wake_util = cpu_util_without(i, p);
+#endif
 			new_util = wake_util + task_util(p);
 			spare_cap = capacity_orig_of(i) - wake_util;
 
@@ -7612,6 +7637,10 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 	u64 start_t = 0;
 	int fastpath = 0;
 
+#ifdef CONFIG_OPCHAIN
+	bool is_uxtop = is_opc_task(p, UT_FORE);
+#endif
+
 	if (trace_sched_task_util_enabled())
 		start_t = sched_clock();
 
@@ -7639,7 +7668,14 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 
 	if (prefer_idle || fbt_env.need_idle)
 		sync = 0;
-
+#ifdef CONFIG_OPCHAIN
+	if (sysctl_sched_sync_hint_enable && sync &&
+			bias_to_this_cpu(p, cpu, start_cpu) &&
+			opc_check_uxtop_cpu(is_uxtop, cpu)) {
+#else
+	if (sysctl_sched_sync_hint_enable && sync &&
+			bias_to_this_cpu(p, cpu, start_cpu)) {
+#endif
 	if (sysctl_sched_sync_hint_enable && sync) {
 		int cpu = smp_processor_id();
 
@@ -7716,6 +7752,13 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 			p->state == TASK_WAKING)
 			delta = task_util(p);
 #endif
+#ifdef CONFIG_RATP
+	if (is_ratp_enable()) {
+		best_energy_cpu = cpu;
+		goto unlock;
+	}
+#endif
+
 		/* Not enough spare capacity on previous cpu */
 		if (__cpu_overutilized(prev_cpu, delta)) {
 			schedstat_inc(p->se.statistics.nr_wakeups_secb_insuff_cap);
@@ -8388,7 +8431,10 @@ enum group_type {
 #define LBF_IGNORE_BIG_TASKS 0x100
 #define LBF_IGNORE_PREFERRED_CLUSTER_TASKS 0x200
 #define LBF_MOVED_RELATED_THREAD_GROUP_TASK 0x400
-
+#ifdef CONFIG_OPCHAIN
+#define LBF_IGNORE_UX_TOP 0x800
+#define LBF_IGNORE_SLAVE 0xC00
+#endif
 struct lb_env {
 	struct sched_domain	*sd;
 
@@ -8584,7 +8630,12 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		!task_fits_max(p, env->dst_cpu))
 		return 0;
 #endif
-
+#ifdef CONFIG_OPCHAIN
+	if (env->flags & LBF_IGNORE_UX_TOP && is_opc_task(p, UT_FORE))
+		return 0;
+	if (env->flags & LBF_IGNORE_SLAVE && UTASK_SLAVE(p))
+		return 0;
+#endif
 	if (task_running(env->src_rq, p)) {
 		schedstat_inc(p->se.statistics.nr_failed_migrations_running);
 		return 0;
@@ -8675,6 +8726,9 @@ static int detach_tasks(struct lb_env *env)
 	unsigned long load;
 	int detached = 0;
 	int orig_loop = env->loop;
+#ifdef CONFIG_OPCHAIN
+	int src_claim = opc_get_claim_on_cpu(env->src_cpu);
+#endif
 
 	lockdep_assert_held(&env->src_rq->lock);
 
@@ -8772,6 +8826,10 @@ next:
 		tasks = &env->src_rq->cfs_tasks;
 		env->flags &= ~(LBF_IGNORE_BIG_TASKS |
 				LBF_IGNORE_PREFERRED_CLUSTER_TASKS);
+#ifdef CONFIG_OPCHAIN
+		if (env->flags & LBF_IGNORE_SLAVE)
+			env->flags &= ~LBF_IGNORE_SLAVE;
+#endif
 		env->loop = orig_loop;
 		goto redo;
 	}
