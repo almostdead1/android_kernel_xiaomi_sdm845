@@ -7055,7 +7055,7 @@ static int start_cpu(struct task_struct *p, bool boosted,
 	else
 		start_cpu = rd->max_cap_orig_cpu;
 #if defined(CONFIG_HOUSTON) && defined(CONFIG_OPCHAIN)
-	if (is_uxtop && current->ravg.demand_scaled >= p->ravg.demand_scaled) {
+	if (is_uxtop && current->ravg.demand >= p->ravg.demand) {
 		ht_rtg_list_add_tail(current);
 	}
 #endif
