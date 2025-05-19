@@ -70,6 +70,9 @@
 #include <linux/pid_namespace.h>
 #include <linux/security.h>
 #include <linux/spinlock.h>
+
+#include <linux/oem/im.h>
+
 #include "binder_alloc.h"
 #include "binder_trace.h"
 
@@ -1173,6 +1176,9 @@ static void binder_do_set_priority(struct task_struct *task,
 	int priority; /* user-space prio value */
 	bool has_cap_nice;
 	unsigned int policy = desired.sched_policy;
+
+	if (im_hwc(task) || task->prio < MAX_RT_PRIO)
+		return;
 
 	if (task->policy == policy && task->normal_prio == desired.prio)
 		return;
@@ -3354,6 +3360,10 @@ static void binder_transaction(struct binder_proc *proc,
 	sg_buf_end_offset = sg_buf_offset + extra_buffers_size -
 		ALIGN(secctx_sz, sizeof(u64));
 	off_min = 0;
+#ifdef CONFIG_OPCHAIN
+	binder_alloc_pass_binder_buffer(&target_proc->alloc,
+					t->buffer, tr->data_size);
+#endif
 	for (buffer_offset = off_start_offset; buffer_offset < off_end_offset;
 	     buffer_offset += sizeof(binder_size_t)) {
 		struct binder_object_header *hdr;

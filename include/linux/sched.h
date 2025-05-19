@@ -2209,6 +2209,13 @@ struct task_struct {
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
 #endif
+#ifdef CONFIG_OPCHAIN
+	u64 utask_tag;
+	u64 utask_tag_base;
+	int etask_claim;
+	int claim_cpu;
+	bool utask_slave;
+#endif
 
 #ifdef CONFIG_CONTROL_CENTER
 	bool cc_enable;

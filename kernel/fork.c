@@ -566,6 +566,13 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 #ifdef CONFIG_RATP
 	tsk->cpus_suggested = CPU_MASK_ALL;
 #endif
+#ifdef CONFIG_OPCHAIN
+	tsk->utask_tag = 0;
+	tsk->utask_tag_base = 0;
+	tsk->etask_claim = 0;
+	tsk->claim_cpu = -1;
+	tsk->utask_slave = 0;
+#endif
 
 	account_kernel_stack(tsk, 1);
 
