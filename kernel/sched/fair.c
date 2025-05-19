@@ -7189,7 +7189,7 @@ retry:
 			wake_util = opc_cpu_util(cpu_util_without(i, p),
 					i, p, fbt_env->op_path);
 #else
-			wake_util = cpu_util_without(i, p);
+			wake_util = cpu_util_wake(i, p);
 #endif
 			new_util = wake_util + task_util(p);
 			spare_cap = capacity_orig_of(i) - wake_util;
@@ -7687,6 +7687,7 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 			goto out;
 		}
 	}
+ }
 
 	if (bias_to_prev_cpu(p, rtg_target)) {
 		target_cpu = prev_cpu;
