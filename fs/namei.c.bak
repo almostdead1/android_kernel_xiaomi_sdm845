@@ -1892,19 +1892,6 @@ static inline int should_follow_link(struct nameidata *nd, struct path *link,
 
 enum {WALK_GET = 1, WALK_PUT = 2};
 
-static inline int lookup_nedf(
-	struct nedf_node *nn,
-	const char *name, size_t len)
-{
-	int i;
-
-	for (i = 0; i < nn->nf_cnt; i++)
-		if (len == nn->nf[i].len &&
-		    !strncmp(nn->nf[i].pathname, name, len))
-			return -ENCACHE;
-	return 0;
-}
-
 static int walk_component(struct nameidata *nd, int flags)
 {
 	struct path path;

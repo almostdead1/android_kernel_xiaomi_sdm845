@@ -1577,6 +1577,7 @@ static __latent_entropy struct task_struct *copy_process(
 {
 	int pidfd = -1, retval;
 	struct task_struct *p;
+	struct nedf_node *nn = NULL;
 
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
@@ -1987,6 +1988,10 @@ static __latent_entropy struct task_struct *copy_process(
 			attach_pid(p, PIDTYPE_PGID);
 			attach_pid(p, PIDTYPE_SID);
 			__this_cpu_inc(process_counts);
+			/*Ted, 20180425, non-exist dcache*/
+			if (!(p->flags & PF_KTHREAD))
+				nn =
+				kmalloc(sizeof(struct nedf_node), __GFP_NOWARN);
 		} else {
 			current->signal->nr_threads++;
 			atomic_inc(&current->signal->live);
