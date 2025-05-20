@@ -72,6 +72,8 @@
 #include <linux/spinlock.h>
 #include "binder_alloc.h"
 #include "binder_trace.h"
+/* curtis, 20180111, opchain*/
+#include <../drivers/oneplus/coretech/uxcore/opchain_helper.h>
 
 static HLIST_HEAD(binder_deferred_list);
 static DEFINE_MUTEX(binder_deferred_lock);

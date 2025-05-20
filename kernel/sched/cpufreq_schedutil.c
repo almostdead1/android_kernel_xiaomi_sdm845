@@ -18,6 +18,7 @@
 #include <linux/sched/sysctl.h>
 #include "sched.h"
 #include "tune.h"
+#include <../drivers/oneplus/coretech/uxcore/opchain_helper.h>
 
 #ifdef CONFIG_HOUSTON
 #include <oneplus/houston/houston_helper.h>

@@ -2495,7 +2495,8 @@ static int ext4_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	err = dquot_initialize(dir);
 	if (err)
 		return err;
-
+        /*ashwini.jain, 2021/05/27 non-exist dcache lookup adding for lower_filesystem EID-11947*/
+        settag_all();
 	credits = (EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
 		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3);
 retry:
@@ -2674,7 +2675,8 @@ static int ext4_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	err = dquot_initialize(dir);
 	if (err)
 		return err;
-
+	/*ashwini.jain, 2021/05/27 non-exist dcache lookup adding for lower_filesystem EID-11947*/
+        settag_all();
 	credits = (EXT4_DATA_TRANS_BLOCKS(dir->i_sb) +
 		   EXT4_INDEX_EXTRA_TRANS_BLOCKS + 3);
 retry:
@@ -3928,7 +3930,8 @@ static int ext4_rename2(struct inode *old_dir, struct dentry *old_dentry,
 				     flags);
 	if (err)
 		return err;
-
+        /*ashwini.jain, 2021/05/27 non-exist dcache lookup adding for lower_filesystem EID-11947*/
+        settag_all();
 	if (flags & RENAME_EXCHANGE) {
 		return ext4_cross_rename(old_dir, old_dentry,
 					 new_dir, new_dentry);
