@@ -72,6 +72,9 @@ extern int sysctl_protected_symlinks;
 extern int sysctl_protected_hardlinks;
 extern int sysctl_protected_fifos;
 extern int sysctl_protected_regular;
+#ifdef CONFIG_OPLUS_FEATURE_FUSE_FS_SHORTCIRCUIT
+extern char *inode_name(struct inode *ino);
+#endif /* CONFIG_OPLUS_FEATURE_FUSE_FS_SHORTCIRCUIT */
 
 /*ashwini.jain, 2021/05/27 non-exist dcache lookup adding for lower_filesystem EID-11947*/
 extern void settag_all(void);
